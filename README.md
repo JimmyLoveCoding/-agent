@@ -78,7 +78,7 @@ JARVIS-DFT 数据库查结构 ──► 结构转图 ──► GNN 预测
 ## 三、项目结构
 
 ```
-agent-project/
+/
 ├── .gitignore               # Git 忽略规则（.env、缓存等不进仓库）
 ├── resources/               # 代码与模型（运行入口都在这里）
 │   ├── agent.py             # 终端对话助手主程序
