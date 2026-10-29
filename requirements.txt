@@ -1,0 +1,17 @@
+# agent-project 依赖清单（conda 环境 agent / Python 3.11）
+# chemeleon-dng 要求 Python >=3.11；现有 gnn 环境是 3.10，新建一个：
+#   conda create -n agent python=3.11 -y && conda activate agent
+#   pip install -r requirements.txt
+
+# —— 预测链 ——
+torch
+numpy
+pymatgen
+chemeleon-dng
+# chgnet  # 弛豫实验用，当前链路未用
+
+# —— agent 链 ——
+openai
+python-dotenv
+fastapi
+uvicorn
