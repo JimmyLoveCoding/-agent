@@ -10,7 +10,7 @@ predict.py —— 用训练好的 GNN 预测晶体性质（兼 agent 的工具�
 同时作为 agent 的工具后端，对外暴露 TOOL_SCHEMA / TOOL_FUNCS。
 依赖：torch、numpy、pymatgen、chemeleon-dng。
 """
-import os
+import osu
 
 import numpy as np
 import torch
