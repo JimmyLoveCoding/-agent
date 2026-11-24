@@ -56,7 +56,7 @@ def pick_best(structures: list):
     """挑代表结构：优先合法结构，再取被重复生成最多的那一类。"""
     candidates = [s for s in structures if _valid(s)] or structures
     clusters = []
-    matcher = StructureMatcher()
+    matcher = StructureMatch()
     for s in candidates:
         for cluster in clusters:
             if matcher.fit(cluster[0], s):
