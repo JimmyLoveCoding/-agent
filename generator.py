@@ -19,7 +19,7 @@ N_SAMPLES = 10      # 每个化学式生成几个候选结构
 
 _dm = None
 
-
+# 到此一游
 def _load():
     """加载 CSP 扩散模型（进程内缓存）。"""
     global _dm
