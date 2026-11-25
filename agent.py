@@ -49,7 +49,12 @@ def run_agent_loop(client, messages):
             result = P.TOOL_FUNCS[tc.function.name](**args)
             messages.append({"role": "tool", "tool_call_id": tc.id,
                              "content": json.dumps(result, ensure_ascii=False)})
-
+# 乱写的 看到删掉            
+def test():
+    x = [0,0,0,0]
+    print("This is a test coding")
+    print("Do not mind that!!!")
+    return "ha ha ha"
 
 def main():
     client = get_client()
