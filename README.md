@@ -17,25 +17,25 @@
 DeepSeek（判断意图、决定调用工具）
    │  化学式
    ▼
-JARVIS-DFT 数据库查结构 ──► 结构转图 ──► GNN 预测
+Chemeleon-DNG 生成候选结构 ──► 结构转图 ──► GNN 预测
    │                                      │
    │                                      ▼
    │                          形成能 / 带隙 / 稳定性
    ▼                                      │
-大模型结合「预测值 + DFT 真值 + 是否见过」组织回答
+大模型结合「候选数 + 三项预测」组织回答
 ```
 
 ### 1.2 每次预测会返回什么
 
-- **prediction**：GNN 模型的预测值（近似 DFT 值，不是实验值）；
-- **dft_reference**：JARVIS 数据库里的 DFT 真值，方便当场对照；
-- **split**：该化学式属于 `train`（训练时见过）还是 `test`（没见过），提醒「记忆」和「泛化」的区别；
-- 一个化学式可能对应多个晶体结构（多晶型），会逐条列出（最多 20 条）。
+- **prediction**：从 10 个扩散采样候选中挑出的代表结构（几何合法、按结构聚类后重复最多）的 GNN 预测值（近似 DFT 值，不是实验值）；
+- **n_structures**：本次生成并参与挑选的候选数（默认 10 个）；
+- 当前结构**未做 MLIP 弛豫**，用于快速验证生成→预测链路。
 
 ### 1.3 后续开发
 
-目前输入化学式只能通过公开数据库JARVIS-DFT转成晶体结构，可以考虑后续把数据库换成神经网络增加泛化性；
-增加用户界面（JavaWeb||desktop）;
+诊断结论：GNN 在真实 JARVIS 结构上正常（FE/GAP/EH MAE = 0.063/0.248/0.144）；Chemeleon 直接采样平均可用；
+CHGNet 弛豫对稀疏结构会产生孤立原子，导致输出失效。因此当前保留“采样 → 过滤/聚类选代表 → GNN”，
+下一步考虑按 Z=1/2/4 生成不同晶胞大小，减少错误相。
 
 
 ## 二、重点：材料分析模型
@@ -78,18 +78,20 @@ JARVIS-DFT 数据库查结构 ──► 结构转图 ──► GNN 预测
 ## 三、项目结构
 
 ```
-/
+agent-project/
 ├── .gitignore               # Git 忽略规则（.env、缓存等不进仓库）
 ├── resources/               # 代码与模型（运行入口都在这里）
-│   ├── agent.py             # 终端对话助手主程序
+│   ├── app.py               # FastAPI 服务（POST /chat）
+│   ├── agent.py             # DeepSeek 工具调用循环
 │   ├── predict.py           # GNN 推理 + agent 工具后端
-│   ├── materials_db.py      # JARVIS 数据库访问层
+│   ├── generator.py         # 化学式 -> 候选结构（Chemeleon-DNG CSP）
 │   ├── dataset.py           # 晶体结构 → 图（建图 + 批处理）
 │   ├── model.py             # GNN 网络结构定义
 │   ├── model.pt             # 训练好的模型权重（约 400 KB）
+│   ├── ckpts/               # Chemeleon 权重（约 147 MB）
 │   ├── requirements.txt     # 依赖清单
-│   ├── .env                 # DeepSeek API Key 配置（当前为空）
-│   └── readme.md            # 本文档
+│   ├── .env                 # DeepSeek API Key
+│   └── README.md            # 本文档
 ```
 
 ---
@@ -97,18 +99,65 @@ JARVIS-DFT 数据库查结构 ──► 结构转图 ──► GNN 预测
 ## 附：快速运行
 
 ```bash
-# 1) 准备环境（只需一次）
-conda create -n gnn python=3.10 -y
-conda activate gnn
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple torch numpy jarvis-tools openai python-dotenv
+# 1) 准备环境（只需一次；chemeleon-dng 需要 Python >=3.11）
+conda create -n agent python=3.11 -y
+conda activate agent
+pip install -r requirements.txt
 
-# 2) 配置 DeepSeek Key（当前未配置）
+# 2) 配置 DeepSeek Key
 #    在 resources/ 目录的 .env 里写入：DEEPSEEK_API_KEY=你的key
 
 # 3) 进入代码目录并运行
 cd XXXpath/resources #（你的路径信息）
+
+# 方式一：终端对话
 python agent.py
+
+# 方式二：启动 FastAPI 服务（前端对接用）
+uvicorn app:app --host 0.0.0.0 --port 8000
 
 # 或者不走 agent，直接命令行预测
 python predict.py --formula GaN Si Al2O3
 python predict.py my_structure.cif
+```
+
+---
+
+## 四、FastAPI 接口
+
+启动服务：
+
+```bash
+conda activate agent
+cd XXXpath/resources
+pip install fastapi uvicorn
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+只有一个接口：
+
+```
+POST /chat
+Content-Type: application/json
+
+{
+  "message": "GaN 的带隙是多少",
+  "history": []
+}
+```
+
+响应：
+
+```json
+{"answer": "..."}
+```
+
+`history` 可选，格式为 `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]`，用于多轮对话。测试：
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\":\"GaN 的带隙是多少\"}"
+```
+
+注意：服务启动时会预加载 Chemeleon 和 GNN；CPU 上单次请求可能需要 1–3 分钟（主要耗在 10 次结构采样），前端超时时间建议设到 300 秒以上。服务内部用锁串行处理请求，前端不要并发发多个查询。
